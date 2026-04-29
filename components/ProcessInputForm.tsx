@@ -1,184 +1,253 @@
 "use client";
 
 import { useState } from "react";
+import { AlgorithmType } from "@/lib/simulator";
+import { Process } from "@/lib/types";
 
+// Keep ProcessRow exported so any remaining legacy imports don't break
 export interface ProcessRow {
-  id: string; // local key for React
+  id: string;
   processId: string;
   arrivalTime: string;
   burstTime: string;
 }
 
 interface Props {
-  onSubmit: (processes: ProcessRow[], quantum: number) => void;
-  loading: boolean;
+  onVisualize: (processes: Process[], algorithm: AlgorithmType, quantum: number) => void;
 }
 
-const emptyRow = (): ProcessRow => ({
+const ALGORITHMS: { value: AlgorithmType; label: string; hint: string }[] = [
+  { value: "SJF",        label: "SJF",          hint: "Non-preemptive" },
+  { value: "SRTF",       label: "SRTF",         hint: "Preemptive SJF"  },
+  { value: "FCFS",       label: "FCFS",         hint: "Arrival order"   },
+  { value: "RoundRobin", label: "Round Robin",  hint: "Time-sliced"     },
+];
+
+const makeRow = (n: number): ProcessRow => ({
   id: crypto.randomUUID(),
-  processId: "",
-  arrivalTime: "",
-  burstTime: "",
+  processId: `P${n}`,
+  arrivalTime: "0",
+  burstTime: "1",
 });
 
-export default function ProcessInputForm({ onSubmit, loading }: Props) {
-  const [rows, setRows] = useState<ProcessRow[]>([emptyRow()]);
+const DEFAULT_ROWS: ProcessRow[] = [
+  { id: "r1", processId: "P1", arrivalTime: "0", burstTime: "6" },
+  { id: "r2", processId: "P2", arrivalTime: "2", burstTime: "4" },
+  { id: "r3", processId: "P3", arrivalTime: "4", burstTime: "2" },
+];
+
+export default function ProcessInputForm({ onVisualize }: Props) {
+  const [rows, setRows] = useState<ProcessRow[]>(DEFAULT_ROWS);
+  const [algorithm, setAlgorithm] = useState<AlgorithmType>("FCFS");
   const [quantum, setQuantum] = useState("2");
   const [errors, setErrors] = useState<string[]>([]);
 
-  const updateRow = (index: number, field: keyof Omit<ProcessRow, "id">, value: string) => {
-    setRows((prev) => {
+  const updateRow = (
+    index: number,
+    field: keyof Omit<ProcessRow, "id">,
+    value: string
+  ) => {
+    setRows(prev => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
       return next;
     });
   };
 
-  const addRow = () => setRows((prev) => [...prev, emptyRow()]);
+  const addRow = () =>
+    setRows(prev => [...prev, makeRow(prev.length + 1)]);
 
   const removeRow = (index: number) => {
-    if (rows.length === 1) return;
-    setRows((prev) => prev.filter((_, i) => i !== index));
+    if (rows.length <= 1) return;
+    setRows(prev => prev.filter((_, i) => i !== index));
   };
 
   const validate = (): string[] => {
     const errs: string[] = [];
-    const seenIds = new Set<string>();
+    const seen = new Set<string>();
 
     rows.forEach((row, i) => {
-      const label = `Row ${i + 1}`;
-      if (!row.processId.trim()) errs.push(`${label}: Process ID is required.`);
-      else if (seenIds.has(row.processId.trim())) errs.push(`${label}: Process ID "${row.processId}" is duplicated.`);
-      else seenIds.add(row.processId.trim());
+      const lbl = `Row ${i + 1}`;
+      const pid = row.processId.trim();
+      if (!pid) {
+        errs.push(`${lbl}: Process ID is required.`);
+      } else if (seen.has(pid)) {
+        errs.push(`${lbl}: Duplicate PID "${pid}".`);
+      } else {
+        seen.add(pid);
+      }
 
-      const arrival = parseInt(row.arrivalTime);
-      if (row.arrivalTime === "" || isNaN(arrival) || arrival < 0)
-        errs.push(`${label}: Arrival Time must be a non-negative integer.`);
+      const at = parseInt(row.arrivalTime);
+      if (row.arrivalTime === "" || isNaN(at) || at < 0)
+        errs.push(`${lbl}: Arrival Time must be ≥ 0.`);
 
-      const burst = parseInt(row.burstTime);
-      if (row.burstTime === "" || isNaN(burst) || burst <= 0)
-        errs.push(`${label}: Burst Time must be a positive integer.`);
+      const bt = parseInt(row.burstTime);
+      if (row.burstTime === "" || isNaN(bt) || bt <= 0)
+        errs.push(`${lbl}: Burst Time must be ≥ 1.`);
     });
 
-    const q = parseInt(quantum);
-    if (isNaN(q) || q < 1) errs.push("Round Robin quantum must be a positive integer.");
+    if (algorithm === "RoundRobin") {
+      const q = parseInt(quantum);
+      if (isNaN(q) || q < 1) errs.push("Quantum must be a positive integer.");
+    }
 
     return errs;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleVisualize = () => {
     const errs = validate();
     setErrors(errs);
     if (errs.length > 0) return;
-    onSubmit(rows, parseInt(quantum));
+
+    const processes: Process[] = rows.map(r => ({
+      processId: r.processId.trim(),
+      arrivalTime: parseInt(r.arrivalTime),
+      burstTime: parseInt(r.burstTime),
+    }));
+
+    onVisualize(processes, algorithm, parseInt(quantum) || 2);
   };
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Process rows */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-slate-500 border-b border-slate-200">
-              <th className="pb-2 pr-4 font-medium">Process ID</th>
-              <th className="pb-2 pr-4 font-medium">Arrival Time</th>
-              <th className="pb-2 pr-4 font-medium">Burst Time</th>
-              <th className="pb-2 font-medium"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {rows.map((row, i) => (
-              <tr key={row.id}>
-                <td className="py-2 pr-4">
-                  <input
-                    type="text"
-                    placeholder="e.g. P1"
-                    value={row.processId}
-                    onChange={(e) => updateRow(i, "processId", e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-slate-800 placeholder-slate-400"
-                  />
-                </td>
-                <td className="py-2 pr-4">
-                  <input
-                    type="number"
-                    placeholder="0"
-                    min="0"
-                    value={row.arrivalTime}
-                    onChange={(e) => updateRow(i, "arrivalTime", e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-slate-800 placeholder-slate-400"
-                  />
-                </td>
-                <td className="py-2 pr-4">
-                  <input
-                    type="number"
-                    placeholder="1"
-                    min="1"
-                    value={row.burstTime}
-                    onChange={(e) => updateRow(i, "burstTime", e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-slate-800 placeholder-slate-400"
-                  />
-                </td>
-                <td className="py-2">
-                  <button
-                    type="button"
-                    onClick={() => removeRow(i)}
-                    disabled={rows.length === 1}
-                    className="px-2 py-1 text-slate-400 hover:text-red-500 disabled:opacity-30 transition-colors"
-                    title="Remove row"
-                  >
-                    ✕
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+  const inputCls =
+    "w-full px-2 py-1.5 bg-slate-900 border border-slate-600 rounded-lg " +
+    "text-slate-100 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 " +
+    "placeholder-slate-600";
 
-      {/* Add row + quantum */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+  return (
+    <div className="bg-[#1e293b] rounded-xl border border-slate-700 p-5 space-y-5 h-fit">
+
+      {/* ── Process table ── */}
+      <div>
+        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">
+          Processes
+        </h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-700">
+                <th className="text-left pb-2 pr-2 text-xs text-slate-500 font-medium">PID</th>
+                <th className="text-left pb-2 pr-2 text-xs text-slate-500 font-medium">Arrival</th>
+                <th className="text-left pb-2 pr-2 text-xs text-slate-500 font-medium">Burst</th>
+                <th className="pb-2 w-7" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/40">
+              {rows.map((row, i) => (
+                <tr key={row.id}>
+                  <td className="py-1.5 pr-2">
+                    <input
+                      type="text"
+                      value={row.processId}
+                      onChange={e => updateRow(i, "processId", e.target.value)}
+                      className={inputCls}
+                      placeholder="P1"
+                    />
+                  </td>
+                  <td className="py-1.5 pr-2">
+                    <input
+                      type="number"
+                      value={row.arrivalTime}
+                      min="0"
+                      onChange={e => updateRow(i, "arrivalTime", e.target.value)}
+                      className={inputCls}
+                    />
+                  </td>
+                  <td className="py-1.5 pr-2">
+                    <input
+                      type="number"
+                      value={row.burstTime}
+                      min="1"
+                      onChange={e => updateRow(i, "burstTime", e.target.value)}
+                      className={inputCls}
+                    />
+                  </td>
+                  <td className="py-1.5">
+                    <button
+                      type="button"
+                      onClick={() => removeRow(i)}
+                      disabled={rows.length <= 1}
+                      className="w-6 h-6 flex items-center justify-center text-slate-600 hover:text-red-400 disabled:opacity-20 transition-colors rounded text-lg leading-none"
+                      title="Remove row"
+                    >
+                      ×
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         <button
           type="button"
           onClick={addRow}
-          className="text-sm text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 transition-colors"
+          className="mt-2.5 text-xs text-indigo-400 hover:text-indigo-300 font-medium transition-colors flex items-center gap-1"
         >
-          <span className="text-lg leading-none">+</span> Add Process
+          + Add Process
         </button>
+      </div>
 
-        <div className="sm:ml-auto flex items-center gap-3">
-          <label className="text-sm font-medium text-slate-600 whitespace-nowrap">
-            RR Quantum:
-          </label>
+      {/* ── Algorithm selector ── */}
+      <div>
+        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">
+          Algorithm
+        </h2>
+        <div className="grid grid-cols-2 gap-2">
+          {ALGORITHMS.map(algo => {
+            const active = algorithm === algo.value;
+            return (
+              <button
+                key={algo.value}
+                type="button"
+                onClick={() => setAlgorithm(algo.value)}
+                className={`py-2 px-3 rounded-lg text-left transition-all border ${
+                  active
+                    ? "bg-indigo-600 border-indigo-500 text-white"
+                    : "bg-slate-800 border-slate-600 text-slate-300 hover:border-indigo-500 hover:text-white"
+                }`}
+              >
+                <div className="text-sm font-semibold leading-tight">{algo.label}</div>
+                <div className={`text-[10px] mt-0.5 ${active ? "text-indigo-200" : "text-slate-500"}`}>
+                  {algo.hint}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Quantum (RR only) ── */}
+      {algorithm === "RoundRobin" && (
+        <div>
+          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">
+            Time Quantum
+          </h2>
           <input
             type="number"
             min="1"
             value={quantum}
-            onChange={(e) => setQuantum(e.target.value)}
-            className="w-20 px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-slate-800"
+            onChange={e => setQuantum(e.target.value)}
+            className={`${inputCls} w-24`}
           />
         </div>
-      </div>
+      )}
 
-      {/* Validation errors */}
+      {/* ── Validation errors ── */}
       {errors.length > 0 && (
-        <div className="rounded-lg bg-red-50 border border-red-200 p-4 space-y-1">
+        <div className="bg-red-950/60 border border-red-700/60 rounded-lg p-3 space-y-1">
           {errors.map((e, i) => (
-            <p key={i} className="text-sm text-red-600">
-              {e}
-            </p>
+            <p key={i} className="text-xs text-red-400">{e}</p>
           ))}
         </div>
       )}
 
-      {/* Submit */}
+      {/* ── Visualize button ── */}
       <button
-        type="submit"
-        disabled={loading}
-        className="w-full py-3 px-6 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold rounded-xl transition-colors shadow-sm"
+        type="button"
+        onClick={handleVisualize}
+        className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold text-sm rounded-xl transition-colors"
       >
-        {loading ? "Running algorithms…" : "Compare Algorithms"}
+        Visualize
       </button>
-    </form>
+    </div>
   );
 }

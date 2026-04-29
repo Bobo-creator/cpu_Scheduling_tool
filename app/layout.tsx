@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CPU Scheduling Efficiency Tool",
-  description: "Compare FCFS, SJF, and Round Robin CPU scheduling algorithms side-by-side.",
+  title: "CPU Scheduling Visualizer",
+  description: "Step-by-step interactive visualization of FCFS, SJF, SRTF, and Round Robin CPU scheduling algorithms.",
 };
 
 export default function RootLayout({

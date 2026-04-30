@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { AlgorithmType } from "@/lib/simulator";
 import { Process } from "@/lib/types";
 
 // Keep ProcessRow exported so any remaining legacy imports don't break
@@ -13,15 +12,8 @@ export interface ProcessRow {
 }
 
 interface Props {
-  onVisualize: (processes: Process[], algorithm: AlgorithmType, quantum: number) => void;
+  onAnalyze: (processes: Process[], quantum: number) => void;
 }
-
-const ALGORITHMS: { value: AlgorithmType; label: string; hint: string }[] = [
-  { value: "SJF",        label: "SJF",          hint: "Non-preemptive" },
-  { value: "SRTF",       label: "SRTF",         hint: "Preemptive SJF"  },
-  { value: "FCFS",       label: "FCFS",         hint: "Arrival order"   },
-  { value: "RoundRobin", label: "Round Robin",  hint: "Time-sliced"     },
-];
 
 const makeRow = (n: number): ProcessRow => ({
   id: crypto.randomUUID(),
@@ -36,9 +28,8 @@ const DEFAULT_ROWS: ProcessRow[] = [
   { id: "r3", processId: "P3", arrivalTime: "4", burstTime: "2" },
 ];
 
-export default function ProcessInputForm({ onVisualize }: Props) {
+export default function ProcessInputForm({ onAnalyze }: Props) {
   const [rows, setRows] = useState<ProcessRow[]>(DEFAULT_ROWS);
-  const [algorithm, setAlgorithm] = useState<AlgorithmType>("FCFS");
   const [quantum, setQuantum] = useState("2");
   const [errors, setErrors] = useState<string[]>([]);
 
@@ -86,15 +77,13 @@ export default function ProcessInputForm({ onVisualize }: Props) {
         errs.push(`${lbl}: Burst Time must be ≥ 1.`);
     });
 
-    if (algorithm === "RoundRobin") {
-      const q = parseInt(quantum);
-      if (isNaN(q) || q < 1) errs.push("Quantum must be a positive integer.");
-    }
+    const q = parseInt(quantum);
+    if (isNaN(q) || q < 1) errs.push("Quantum must be a positive integer.");
 
     return errs;
   };
 
-  const handleVisualize = () => {
+  const handleAnalyze = () => {
     const errs = validate();
     setErrors(errs);
     if (errs.length > 0) return;
@@ -105,7 +94,7 @@ export default function ProcessInputForm({ onVisualize }: Props) {
       burstTime: parseInt(r.burstTime),
     }));
 
-    onVisualize(processes, algorithm, parseInt(quantum) || 2);
+    onAnalyze(processes, parseInt(quantum) || 2);
   };
 
   const inputCls =
@@ -186,50 +175,22 @@ export default function ProcessInputForm({ onVisualize }: Props) {
         </button>
       </div>
 
-      {/* ── Algorithm selector ── */}
+      {/* ── Time quantum for Round Robin ── */}
       <div>
-        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">
-          Algorithm
+        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">
+          Round Robin Quantum
         </h2>
-        <div className="grid grid-cols-2 gap-2">
-          {ALGORITHMS.map(algo => {
-            const active = algorithm === algo.value;
-            return (
-              <button
-                key={algo.value}
-                type="button"
-                onClick={() => setAlgorithm(algo.value)}
-                className={`py-2 px-3 rounded-lg text-left transition-all border ${
-                  active
-                    ? "bg-indigo-600 border-indigo-500 text-white"
-                    : "bg-slate-800 border-slate-600 text-slate-300 hover:border-indigo-500 hover:text-white"
-                }`}
-              >
-                <div className="text-sm font-semibold leading-tight">{algo.label}</div>
-                <div className={`text-[10px] mt-0.5 ${active ? "text-indigo-200" : "text-slate-500"}`}>
-                  {algo.hint}
-                </div>
-              </button>
-            );
-          })}
-        </div>
+        <input
+          type="number"
+          min="1"
+          value={quantum}
+          onChange={e => setQuantum(e.target.value)}
+          className={`${inputCls} w-24`}
+        />
+        <p className="mt-2 text-xs text-slate-500">
+          The engine will compare all algorithms and use this value for Round Robin.
+        </p>
       </div>
-
-      {/* ── Quantum (RR only) ── */}
-      {algorithm === "RoundRobin" && (
-        <div>
-          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">
-            Time Quantum
-          </h2>
-          <input
-            type="number"
-            min="1"
-            value={quantum}
-            onChange={e => setQuantum(e.target.value)}
-            className={`${inputCls} w-24`}
-          />
-        </div>
-      )}
 
       {/* ── Validation errors ── */}
       {errors.length > 0 && (
@@ -240,13 +201,13 @@ export default function ProcessInputForm({ onVisualize }: Props) {
         </div>
       )}
 
-      {/* ── Visualize button ── */}
+      {/* ── Analyze button ── */}
       <button
         type="button"
-        onClick={handleVisualize}
+        onClick={handleAnalyze}
         className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold text-sm rounded-xl transition-colors"
       >
-        Visualize
+        Analyze
       </button>
     </div>
   );

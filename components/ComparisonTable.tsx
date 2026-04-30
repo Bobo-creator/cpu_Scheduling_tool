@@ -5,6 +5,7 @@ import { AlgorithmResult } from "@/lib/types";
 const ALGO_LABELS: Record<string, string> = {
   FCFS: "FCFS",
   SJF: "SJF",
+  SRTF: "SRTF",
   RoundRobin: "Round Robin",
 };
 
@@ -16,52 +17,37 @@ interface Props {
 export default function ComparisonTable({ results, bestAlgorithmName }: Props) {
   return (
     <div className="space-y-6">
-      {/* Summary comparison table */}
-      <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-3xl border border-slate-700 bg-slate-900 shadow-xl">
+        <table className="w-full text-sm text-slate-200">
           <thead>
-            <tr className="bg-slate-800 text-white">
+            <tr className="bg-slate-800 text-slate-200">
               <th className="text-left px-5 py-3 font-semibold">Algorithm</th>
-              <th className="text-right px-5 py-3 font-semibold">Avg Wait Time</th>
+              <th className="text-right px-5 py-3 font-semibold">Avg Wait</th>
               <th className="text-right px-5 py-3 font-semibold">Avg Turnaround</th>
-              <th className="text-right px-5 py-3 font-semibold">CPU Utilization</th>
-              <th className="text-right px-5 py-3 font-semibold">Throughput</th>
+              <th className="text-right px-5 py-3 font-semibold">Context Switches</th>
+              <th className="text-right px-5 py-3 font-semibold">Score</th>
             </tr>
           </thead>
           <tbody>
-            {results.map((r, i) => {
+            {results.map((r) => {
               const isBest = r.algorithmName === bestAlgorithmName;
               return (
                 <tr
                   key={r.algorithmName}
-                  className={
-                    isBest
-                      ? "bg-emerald-50 border-l-4 border-emerald-500"
-                      : i % 2 === 0
-                      ? "bg-white"
-                      : "bg-slate-50"
-                  }
+                  className={isBest ? "bg-indigo-950/70 border-l-4 border-indigo-400" : "border-b border-slate-800"}
                 >
-                  <td className="px-5 py-3 font-medium text-slate-800">
+                  <td className="px-5 py-3 font-medium text-slate-100">
                     {ALGO_LABELS[r.algorithmName]}
                     {isBest && (
-                      <span className="ml-2 text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                      <span className="ml-2 text-[11px] font-semibold text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-full">
                         Best
                       </span>
                     )}
                   </td>
-                  <td className="px-5 py-3 text-right tabular-nums text-slate-700">
-                    {r.avgWaitingTime} ms
-                  </td>
-                  <td className="px-5 py-3 text-right tabular-nums text-slate-700">
-                    {r.avgTurnaroundTime} ms
-                  </td>
-                  <td className="px-5 py-3 text-right tabular-nums text-slate-700">
-                    {r.cpuUtilization}%
-                  </td>
-                  <td className="px-5 py-3 text-right tabular-nums text-slate-700">
-                    {r.throughput} p/ms
-                  </td>
+                  <td className="px-5 py-3 text-right tabular-nums text-slate-200">{r.avgWaitingTime} ms</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-slate-200">{r.avgTurnaroundTime} ms</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-slate-200">{r.contextSwitches}</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-indigo-300 font-semibold">{r.score}</td>
                 </tr>
               );
             })}
@@ -69,40 +55,29 @@ export default function ComparisonTable({ results, bestAlgorithmName }: Props) {
         </table>
       </div>
 
-      {/* Per-algorithm process breakdown */}
       <div className="grid gap-6 md:grid-cols-3">
         {results.map((r) => {
           const isBest = r.algorithmName === bestAlgorithmName;
           return (
             <div
               key={r.algorithmName}
-              className={`rounded-xl border p-4 shadow-sm ${
-                isBest ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white"
+              className={`rounded-3xl border p-4 shadow-sm ${
+                isBest ? "border-indigo-500/30 bg-slate-950" : "border-slate-700 bg-slate-900"
               }`}
             >
-              <h3 className={`font-semibold mb-3 text-sm ${isBest ? "text-emerald-800" : "text-slate-700"}`}>
+              <h3 className={`font-semibold mb-3 text-sm ${isBest ? "text-white" : "text-slate-300"}`}>
                 {ALGO_LABELS[r.algorithmName]} — Per Process
               </h3>
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-slate-500 border-b border-slate-200">
-                    <th className="text-left pb-1 font-medium">PID</th>
-                    <th className="text-right pb-1 font-medium">Wait</th>
-                    <th className="text-right pb-1 font-medium">TAT</th>
-                    <th className="text-right pb-1 font-medium">Finish</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {r.perProcessResults.map((p) => (
-                    <tr key={p.processId}>
-                      <td className="py-1 text-slate-700 font-medium">{p.processId}</td>
-                      <td className="py-1 text-right tabular-nums text-slate-600">{p.waitingTime}</td>
-                      <td className="py-1 text-right tabular-nums text-slate-600">{p.turnaroundTime}</td>
-                      <td className="py-1 text-right tabular-nums text-slate-600">{p.completionTime}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="space-y-2 text-xs text-slate-400">
+                {r.perProcessResults.map((p) => (
+                  <div key={p.processId} className="grid grid-cols-[1fr_80px_80px_80px] gap-2 py-1 border-b border-slate-800 last:border-b-0">
+                    <span className="font-medium text-slate-100">{p.processId}</span>
+                    <span className="text-right">{p.waitingTime}</span>
+                    <span className="text-right">{p.turnaroundTime}</span>
+                    <span className="text-right">{p.completionTime}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           );
         })}

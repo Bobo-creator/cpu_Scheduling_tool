@@ -68,11 +68,11 @@ export default function ProcessInputForm({ onAnalyze }: Props) {
         seen.add(pid);
       }
 
-      const at = parseInt(row.arrivalTime);
+      const at = parseInt(row.arrivalTime, 10);
       if (row.arrivalTime === "" || isNaN(at) || at < 0)
         errs.push(`${lbl}: Arrival Time must be ≥ 0.`);
 
-      const bt = parseInt(row.burstTime);
+      const bt = parseInt(row.burstTime, 10);
       if (row.burstTime === "" || isNaN(bt) || bt <= 0)
         errs.push(`${lbl}: Burst Time must be ≥ 1.`);
     });
@@ -90,11 +90,11 @@ export default function ProcessInputForm({ onAnalyze }: Props) {
 
     const processes: Process[] = rows.map(r => ({
       processId: r.processId.trim(),
-      arrivalTime: parseInt(r.arrivalTime),
-      burstTime: parseInt(r.burstTime),
+      arrivalTime: parseInt(r.arrivalTime, 10),
+      burstTime: parseInt(r.burstTime, 10),
     }));
 
-    onAnalyze(processes, parseInt(quantum) || 2);
+    onAnalyze(processes, parseInt(quantum, 10) || 2);
   };
 
   const inputCls =

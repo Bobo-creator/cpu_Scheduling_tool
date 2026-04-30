@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { simulate } from "@/lib/simulator";
 import { calculateMetrics } from "@/lib/metrics";
 import { generateRecommendation, scoreResults } from "@/lib/recommend";
-import { Process } from "@/lib/types";
+import { Process, AlgorithmResult } from "@/lib/types";
 
 function countContextSwitches(steps: { processId: string | null }[]) {
   let switches = 0;
@@ -21,8 +21,8 @@ function countContextSwitches(steps: { processId: string | null }[]) {
 
 function buildPrompt(
   processes: Process[],
-  results: { algorithmName: string; avgWaitingTime: number; avgTurnaroundTime: number; contextSwitches: number; cpuUtilization: number; throughput: number; score: number; }[],
-  recommendationAlgorithm: string
+  results: AlgorithmResult[],
+  recommendationAlgorithm: AlgorithmResult["algorithmName"]
 ) {
   const processTable = processes
     .map((p) => `${p.processId} | ${p.arrivalTime} | ${p.burstTime}`)
@@ -57,8 +57,8 @@ Provide a concise helpful summary with enough detail for a student or developer 
 
 async function getAiExplanation(
   processes: Process[],
-  results: { algorithmName: string; avgWaitingTime: number; avgTurnaroundTime: number; contextSwitches: number; cpuUtilization: number; throughput: number; score: number; }[],
-  recommendationAlgorithm: string
+  results: AlgorithmResult[],
+  recommendationAlgorithm: AlgorithmResult["algorithmName"]
 ) {
   const apiKey = process.env.CLAUDE_API_KEY;
   if (!apiKey) return "";

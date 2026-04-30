@@ -25,7 +25,7 @@ export interface AlgorithmResult {
 }
 
 export interface Recommendation {
-  algorithmName: string;
+  algorithmName: AlgorithmResult["algorithmName"];
   reasonText: string;
 }
 

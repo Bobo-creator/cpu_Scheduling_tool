@@ -2,7 +2,8 @@ import { ProcessResult, AlgorithmResult } from "./types";
 
 export function calculateMetrics(
   algorithmName: AlgorithmResult["algorithmName"],
-  results: ProcessResult[]
+  results: ProcessResult[],
+  contextSwitches: number
 ): AlgorithmResult {
   const n = results.length;
 
@@ -27,5 +28,7 @@ export function calculateMetrics(
     avgTurnaroundTime: parseFloat(avgTurnaroundTime.toFixed(2)),
     cpuUtilization: parseFloat(cpuUtilization.toFixed(2)),
     throughput: parseFloat(throughput.toFixed(4)),
+    contextSwitches,
+    score: 0,
   };
 }

@@ -1,10 +1,93 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runFCFS } from "@/lib/fcfs";
-import { runSJF } from "@/lib/sjf";
-import { runRoundRobin } from "@/lib/roundRobin";
+import { simulate } from "@/lib/simulator";
 import { calculateMetrics } from "@/lib/metrics";
-import { generateRecommendation } from "@/lib/recommend";
-import { Process } from "@/lib/types";
+import { generateRecommendation, scoreResults } from "@/lib/recommend";
+import { Process, AlgorithmResult } from "@/lib/types";
+
+function countContextSwitches(steps: { processId: string | null }[]) {
+  let switches = 0;
+  let lastPid: string | null = null;
+
+  for (const step of steps) {
+    if (step.processId === null) continue;
+    if (lastPid !== null && step.processId !== lastPid) {
+      switches += 1;
+    }
+    lastPid = step.processId;
+  }
+
+  return switches;
+}
+
+function buildPrompt(
+  processes: Process[],
+  results: AlgorithmResult[],
+  recommendationAlgorithm: AlgorithmResult["algorithmName"]
+) {
+  const processTable = processes
+    .map((p) => `${p.processId} | ${p.arrivalTime} | ${p.burstTime}`)
+    .join("\n");
+
+  const metricsTable = results
+    .map(
+      (r) =>
+        `${r.algorithmName} | wait=${r.avgWaitingTime} | turnaround=${r.avgTurnaroundTime} | switches=${r.contextSwitches} | util=${r.cpuUtilization}% | throughput=${r.throughput} | score=${r.score}`
+    )
+    .join("\n");
+
+  return `You are an expert operating systems assistant. A user has submitted a CPU scheduling workload and a rule-based analysis has already been computed.
+
+Workload:
+PID | Arrival | Burst
+${processTable}
+
+Algorithm metrics:
+Algorithm | Avg Wait | Avg Turnaround | Context Switches | CPU Utilization | Throughput | Score
+${metricsTable}
+
+Recommendation: ${recommendationAlgorithm}
+
+Please explain in plain English:
+- Which algorithm is the best choice for this specific input and why
+- Any tradeoffs that matter for this workload
+- What kind of workload profile this input represents
+
+Provide a concise helpful summary with enough detail for a student or developer to understand the decision.`;
+}
+
+async function getAiExplanation(
+  processes: Process[],
+  results: AlgorithmResult[],
+  recommendationAlgorithm: AlgorithmResult["algorithmName"]
+) {
+  const apiKey = process.env.CLAUDE_API_KEY;
+  if (!apiKey) return "";
+
+  const prompt = buildPrompt(processes, results, recommendationAlgorithm);
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/complete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 500,
+        temperature: 0.2,
+        prompt,
+      }),
+    });
+
+    if (!response.ok) return "";
+
+    const data = await response.json();
+    return data?.completion ? String(data.completion).trim() : "";
+  } catch {
+    return "";
+  }
+}
 
 export async function POST(req: NextRequest) {
   let body: { processes: Process[]; quantum?: number };
@@ -43,7 +126,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Check duplicate process IDs
   const ids = processes.map((p) => p.processId);
   if (new Set(ids).size !== ids.length) {
     return NextResponse.json({ error: "Process IDs must be unique." }, { status: 400 });
@@ -53,20 +135,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "quantum must be a positive integer." }, { status: 400 });
   }
 
-  // --- Run Algorithms ---
-  const fcfsResults = runFCFS(processes);
-  const sjfResults = runSJF(processes);
-  const rrResults = runRoundRobin(processes, quantum);
+  const algorithms = [
+    simulate(processes, "FCFS"),
+    simulate(processes, "SJF"),
+    simulate(processes, "SRTF"),
+    simulate(processes, "RoundRobin", quantum),
+  ];
 
-  // --- Compute Metrics ---
-  const fcfsMetrics = calculateMetrics("FCFS", fcfsResults);
-  const sjfMetrics = calculateMetrics("SJF", sjfResults);
-  const rrMetrics = calculateMetrics("RoundRobin", rrResults);
+  const results = algorithms.map((simulation) =>
+    calculateMetrics(
+      simulation.algorithm,
+      simulation.processResults,
+      countContextSwitches(simulation.steps)
+    )
+  );
 
-  const results = [fcfsMetrics, sjfMetrics, rrMetrics];
+  const scoredResults = scoreResults(results);
+  const recommendation = generateRecommendation(scoredResults);
+  const aiExplanation = await getAiExplanation(processes, scoredResults, recommendation.algorithmName);
 
-  // --- Recommendation ---
-  const recommendation = generateRecommendation(results);
-
-  return NextResponse.json({ results, recommendation });
+  return NextResponse.json({ results: scoredResults, recommendation, aiExplanation });
 }

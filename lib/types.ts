@@ -14,20 +14,23 @@ export interface ProcessResult extends Process {
 }
 
 export interface AlgorithmResult {
-  algorithmName: "FCFS" | "SJF" | "RoundRobin";
+  algorithmName: "FCFS" | "SJF" | "SRTF" | "RoundRobin";
   perProcessResults: ProcessResult[];
   avgWaitingTime: number;
   avgTurnaroundTime: number;
   cpuUtilization: number;
   throughput: number;
+  contextSwitches: number;
+  score: number;
 }
 
 export interface Recommendation {
-  algorithmName: string;
+  algorithmName: AlgorithmResult["algorithmName"];
   reasonText: string;
 }
 
 export interface ComparisonOutput {
   results: AlgorithmResult[];
   recommendation: Recommendation;
+  aiExplanation?: string;
 }

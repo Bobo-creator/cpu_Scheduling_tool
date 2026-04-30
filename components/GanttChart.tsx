@@ -69,8 +69,6 @@ export default function GanttChart({
       {/* ── Time axis ── */}
       <div className="relative flex h-5">
         {steps.map((step, i) => {
-          const leftPct =
-            ((step.startTime - startTime) / timeSpan) * 100;
           const widthPct =
             ((step.endTime - step.startTime) / timeSpan) * 100;
           const showLabel = widthPct >= 4; // skip labels for very narrow blocks

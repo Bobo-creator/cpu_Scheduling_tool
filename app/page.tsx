@@ -38,7 +38,7 @@ const ALGO_LABELS: Record<AlgorithmType, string> = {
   RoundRobin:  "Round Robin",
 };
 
-// ── Component ─────────────────────────────────────────────────────────────
+// ── Component  part ─────────────────────────────────────────────────────────────
 export default function Home() {
   const [simulation, setSimulation] = useState<SimulationOutput | null>(null);
   const [processColors, setProcessColors] = useState<Record<string, string>>({});

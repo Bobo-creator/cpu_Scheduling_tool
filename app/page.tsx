@@ -38,6 +38,7 @@ const ALGO_LABELS: Record<AlgorithmType, string> = {
   RoundRobin: "Round Robin",
 };
 
+// ── Component  part ─────────────────────────────────────────────────────────────
 export default function Home() {
   const [analysisResults, setAnalysisResults] = useState<AlgorithmResult[] | null>(null);
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
